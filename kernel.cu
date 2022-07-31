@@ -38,7 +38,7 @@ int deviceCheck(const int device_num) {
 
 
 // cusparseLtMatmul  -->  D = alpha * A * B + beta * C
-int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int m, const int n, const int k, const int device_num)
+int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int m, const int n, const int k, const int device_num = 0)
 {
     int dv_check = deviceCheck(device_num);
     if (dv_check == EXIT_UNSUPPORTED) return EXIT_FAILURE;
@@ -319,7 +319,7 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUDA(cudaMemcpy(dB, hB, B_size, cudaMemcpyHostToDevice))
     CHECK_CUDA(cudaMemset(dC, 0, C_size))
 
-     int* d_csr_offsets, * d_csr_columns;
+    int* d_csr_offsets, * d_csr_columns;
     __half* d_csr_values;
     CHECK_CUDA(cudaMalloc((void**)&d_csr_offsets, (num_A_rows + 1) * sizeof(int)))
 
@@ -334,7 +334,7 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
 
     CHECK_CUSPARSE(cusparseCreate(&handle))
     CHECK_CUSPARSE(cusparseCreateDnMat(&tmpA, num_A_rows, num_A_cols, lda, dA_pruned, type, order))
-    CHECK_CUSPARSE(cusparseCreateCsr(&matA, num_A_rows, num_A_cols, 0, d_csr_offsets, NULL, NULL, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, type)) // Create sparse matrix A in Coo format   
+    CHECK_CUSPARSE(cusparseCreateCsr(&matA, num_A_rows, num_A_cols, 0, d_csr_offsets, NULL, NULL, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, type)) // Create sparse matrix A in Csr format   
     // allocate an external buffer if needed
     CHECK_CUSPARSE(cusparseDenseToSparse_bufferSize(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, &bufferSize1))
     CHECK_CUDA(cudaMalloc(&dBuffer1, bufferSize1))
@@ -360,7 +360,7 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    CHECK_CUSPARSE(cusparseSpMM(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, matB, &beta, matC, CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
+    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float ms = 0.0f;
@@ -368,6 +368,8 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     std::cout << "cusparseCSR spending time : " << ms << "ms" << std::endl;
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
+
+    CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
@@ -466,7 +468,7 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    CHECK_CUSPARSE(cusparseSpMM(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, matB, &beta, matC, CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
+    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float ms = 0.0f;
@@ -474,6 +476,8 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     std::cout << "cusparseCSC spending time : " << ms << "ms" << std::endl;
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
+
+    CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
@@ -485,7 +489,7 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUDA(cudaFree(dBuffer2))
     CHECK_CUDA(cudaFree(d_csc_offsets))
     CHECK_CUDA(cudaFree(d_csc_rows))
-    CHECK_CUDA(cudaFree(d_csc_offsets))
+    CHECK_CUDA(cudaFree(d_csc_values))
     CHECK_CUDA(cudaFree(dB))
     CHECK_CUDA(cudaFree(dC))
 

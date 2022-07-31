@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include<time.h>
 #include "_kernel.cuh"
 
 
@@ -33,6 +34,7 @@ void compareMatrix(const T* A, const T* B, const int row, const int col)
     return;
 }
 
+
 int main(void)
 {
     // A(m * k), B(k, n), C(m, n) --> row-major order
@@ -49,32 +51,44 @@ int main(void)
     __half* hA_pruned = (__half*)malloc(A_size * sizeof(__half));   memset(hA_pruned, 0, A_size * sizeof(__half));
     __half* hB = (__half*)malloc(B_size * sizeof(__half));
     __half* lt_hC = (__half*)malloc(C_size * sizeof(__half));           memset(lt_hC, 0, C_size * sizeof(__half));
-    __half* csr_hC = (__half*)malloc(C_size * sizeof(__half));           memset(csr_hC, 0, C_size * sizeof(__half));
     __half* coo_hC = (__half*)malloc(C_size * sizeof(__half));           memset(coo_hC, 0, C_size * sizeof(__half));
+    __half* csr_hC = (__half*)malloc(C_size * sizeof(__half));           memset(csr_hC, 0, C_size * sizeof(__half));
+    __half* csc_hC = (__half*)malloc(C_size * sizeof(__half));           memset(csc_hC, 0, C_size * sizeof(__half));
 
-    // fill matrix A, matrix B
+
+    srand(time(NULL));
+    // fill matrix A, matrix B  0 ~ 9 
     for (int i = 0; i < A_size; i++)
         hA[i] = static_cast<__half>(static_cast<float>(std::rand() % 10));
     for (int i = 0; i < B_size; i++)
         hB[i] = static_cast<__half>(static_cast<float>(std::rand() % 10));
 
-
-    cusLtMatmul(hA, hB, lt_hC, hA_pruned, m, n, k, 0);     // --> hA_pruned copy 해온다.
-
+    
+    // sparsity 50%
+    cusLtMatmul(hA, hB, lt_hC, hA_pruned, m, n, k);     // --> hA_pruned copy 해온다.
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);    
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
+    
+    // sparsity 75%
 
-    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
+    // sparsity 87.5%
 
-    // compareMatrix(lt_hC, coo_hC, m, n);
+    // sparsity 99%
+
+
+
+    // compareMatrix(lt_hC, csc_hC, m, n);
 
 
     // free host memory
     free(hA);
+    free(hA_pruned);
     free(hB);
     free(lt_hC);
     free(coo_hC);
     free(csr_hC);
-    free(hA_pruned);
+    free(csc_hC);
 
     return EXIT_SUCCESS;
 }
