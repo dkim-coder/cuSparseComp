@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <cmath>
 #include<time.h>
 #include "_kernel.cuh"
 
@@ -30,6 +31,46 @@ void compareMatrix(const T* A, const T* B, const int row, const int col)
             }
         }
     }
+
+    return;
+}
+
+template <typename T = __half>
+void makeSparsity(T* A, const int row, const int col, const double sparsity)
+{
+    int target_nz = static_cast<int>(ceil(row * col * sparsity));     // number of zero in matrix 
+    int matrix_nz = 0;
+    int i = 0;
+    int j = 0;
+    int pos;
+
+    // find nubmer of zero in matrix
+    for (i = 0; i < row; i++) {
+        for (j = 0; j < col; j++) {
+            if (A[col * i + j] == 0) matrix_nz++;
+        }
+    }   
+
+    bool exitOuterLoop = false;
+    srand(time(NULL));
+    while (true) {
+        for (i = 0; i < row; i++) {
+            for (j = 0; j < col; j += (rand() % 4)) {
+                pos = col * i + j;
+                if (A[pos] != 0) {
+                    A[pos] = 0.;
+                    matrix_nz += 1;
+                    if (matrix_nz == target_nz) {
+                        exitOuterLoop = true;
+                        break;
+                    }
+                }
+                if (exitOuterLoop == true)break;
+            }
+            if (exitOuterLoop == true)break;
+        }
+        if (exitOuterLoop == true)break;
+    }    
 
     return;
 }
@@ -65,17 +106,32 @@ int main(void)
 
     
     // sparsity 50%
+    std::cout << "sparisty is 50%" << std::endl;
     cusLtMatmul(hA, hB, lt_hC, hA_pruned, m, n, k);     // --> hA_pruned copy ÇØ¿Â´Ù.
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);    
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
     
     // sparsity 75%
-
+    std::cout << "sparisty is 75%" << std::endl;
+    makeSparsity(hA_pruned, m, k, 0.75);
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
+    
     // sparsity 87.5%
-
+    std::cout << "sparisty is 87.5%" << std::endl;
+    makeSparsity(hA_pruned, m, k, 0.875);
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
+    
     // sparsity 99%
-
+    std::cout << "sparisty is 99%" << std::endl;
+    makeSparsity(hA_pruned, m, k, 0.99);
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
 
 
     // compareMatrix(lt_hC, csc_hC, m, n);
