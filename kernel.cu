@@ -23,32 +23,26 @@
     }                                                                          \
 }  
 
-
 constexpr int EXIT_UNSUPPORTED = 2;
-// check compatibility  -->  nvidia Ampere
-int deviceCheck(const int device_num) {
+
+// cusparseLtMatmul  -->  D = alpha * A * B + beta * C
+template <typename T>
+int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, const int k, const int device_num = 0)
+{
     int major_cc, minor_cc;
     CHECK_CUDA(cudaDeviceGetAttribute(&major_cc, cudaDevAttrComputeCapabilityMajor, device_num))
     CHECK_CUDA(cudaDeviceGetAttribute(&minor_cc, cudaDevAttrComputeCapabilityMinor, device_num))
-        if (!(major_cc == 8 && minor_cc == 0) && !(major_cc == 8 && minor_cc == 6)) {
-            std::cout << "\ncusparseLt is supported only on GPU devices with compute capability == 8.0, 8.6 current: " << major_cc << "." << minor_cc << std::endl;
-            return EXIT_UNSUPPORTED;
-        }
-}
-
-
-// cusparseLtMatmul  -->  D = alpha * A * B + beta * C
-int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int m, const int n, const int k, const int device_num = 0)
-{
-    int dv_check = deviceCheck(device_num);
-    if (dv_check == EXIT_UNSUPPORTED) return EXIT_FAILURE;
+    if (!(major_cc == 8 && minor_cc == 0) && !(major_cc == 8 && minor_cc == 6)) {
+        std::cout << "\ncusparseLt is supported only on GPU devices with compute capability == 8.0, 8.6 current: " << major_cc << "." << minor_cc << std::endl;
+        return EXIT_UNSUPPORTED;
+    }
     
     // matrix A, B, C : NON_TRANSPOSE, row-major
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
-    auto          type = CUDA_R_16F;
-    auto          compute_type = CUSPARSE_COMPUTE_16F;
+    auto          type = CUDA_R_32F;
+    auto          compute_type = CUSPARSE_COMPUTE_TF32;
     bool     is_rowmajor = (order == CUSPARSE_ORDER_ROW);
     bool     isA_transposed = (opA != CUSPARSE_OPERATION_NON_TRANSPOSE);
     bool     isB_transposed = (opB != CUSPARSE_OPERATION_NON_TRANSPOSE);
@@ -58,22 +52,22 @@ int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int
     auto     num_B_cols = (isB_transposed) ? k : n;
     auto     num_C_rows = m;
     auto     num_C_cols = n;
-    unsigned alignment = 16;    // mutiple of 16   (processor가 8byte단위로 읽어옴 64bit os) --> 프로세서 접근 횟수 줄여줌
+    unsigned alignment = 32;    // mutiple of 32   (processor가 8byte단위로 읽어옴 64bit os) --> 프로세서 접근 횟수 줄여줌
     auto     lda = (is_rowmajor) ? num_A_cols : num_A_rows;
     auto     ldb = (is_rowmajor) ? num_B_cols : num_B_rows;
     auto     ldc = (is_rowmajor) ? num_C_cols : num_C_rows;
     auto     A_height = (is_rowmajor) ? num_A_rows : num_A_cols;
     auto     B_height = (is_rowmajor) ? num_B_rows : num_B_cols;
     auto     C_height = (is_rowmajor) ? num_C_rows : num_C_cols;
-    auto     A_size = A_height * lda * sizeof(__half);
-    auto     B_size = B_height * ldb * sizeof(__half);
-    auto     C_size = C_height * ldc * sizeof(__half);
+    auto     A_size = A_height * lda * sizeof(T);
+    auto     B_size = B_height * ldb * sizeof(T);
+    auto     C_size = C_height * ldc * sizeof(T);
 
     float alpha = 1.0f;
     float beta = 0.0f;
 
     // Device memory management
-    __half* dA, * dB, * dC, * dD, * dA_compressed;
+    T* dA, * dB, * dC, * dD, * dA_compressed;
     CHECK_CUDA(cudaMalloc((void**)&dA, A_size))  
     CHECK_CUDA(cudaMalloc((void**)&dB, B_size))  
     CHECK_CUDA(cudaMalloc((void**)&dC, C_size))  
@@ -168,13 +162,13 @@ int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int
     return EXIT_SUCCESS;
 }
 
-
-int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k)
+template <typename T>
+int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
-    auto          type = CUDA_R_16F;
+    auto          type = CUDA_R_32F;
     auto          compute_type = CUDA_R_32F;
     bool     is_rowmajor = (order == CUSPARSE_ORDER_ROW);
     bool     isA_transposed = (opA != CUSPARSE_OPERATION_NON_TRANSPOSE);
@@ -191,15 +185,15 @@ int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     auto     A_height = (is_rowmajor) ? num_A_rows : num_A_cols;
     auto     B_height = (is_rowmajor) ? num_B_rows : num_B_cols;
     auto     C_height = (is_rowmajor) ? num_C_rows : num_C_cols;
-    auto     A_size = A_height * lda * sizeof(__half);
-    auto     B_size = B_height * ldb * sizeof(__half);
-    auto     C_size = C_height * ldc * sizeof(__half);
+    auto     A_size = A_height * lda * sizeof(T);
+    auto     B_size = B_height * ldb * sizeof(T);
+    auto     C_size = C_height * ldc * sizeof(T);
             
     float alpha = 1.0f;
     float beta = 0.0f;
   
     // Device memory management
-    __half * dA_pruned, * dB, * dC;
+    T * dA_pruned, * dB, * dC;
     CHECK_CUDA(cudaMalloc((void**)&dA_pruned, A_size))
     CHECK_CUDA(cudaMalloc((void**)&dB, B_size))
     CHECK_CUDA(cudaMalloc((void**)&dC, C_size))
@@ -208,7 +202,7 @@ int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUDA(cudaMemset(dC, 0, C_size))   
     
     int* d_coo_rows, * d_coo_columns;
-    __half* d_coo_values;
+    T* d_coo_values;
         
     // convert dense matrix tmpA --> sparse matrix matA in COO format
     cusparseHandle_t     handle = NULL;
@@ -230,7 +224,7 @@ int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUSPARSE(cusparseSpMatGetSize(matA, &num_rows_tmp, &num_cols_tmp, &nnz))    // get number of non-zero elements
     CHECK_CUDA(cudaMalloc((void**)&d_coo_rows, nnz * sizeof(int)))
     CHECK_CUDA(cudaMalloc((void**)&d_coo_columns, nnz * sizeof(int)))
-    CHECK_CUDA(cudaMalloc((void**)&d_coo_values, nnz * sizeof(__half)))
+    CHECK_CUDA(cudaMalloc((void**)&d_coo_values, nnz * sizeof(T)))
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCooSetPointers(matA, d_coo_rows, d_coo_columns, d_coo_values))
     // execute Dense to Sparse conversion
@@ -280,13 +274,13 @@ int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     return EXIT_SUCCESS;
 }
 
-
-int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k)
+template <typename T>
+int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
-    auto          type = CUDA_R_16F;
+    auto          type = CUDA_R_32F;
     auto          compute_type = CUDA_R_32F;
     bool     is_rowmajor = (order == CUSPARSE_ORDER_ROW);
     bool     isA_transposed = (opA != CUSPARSE_OPERATION_NON_TRANSPOSE);
@@ -303,15 +297,15 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     auto     A_height = (is_rowmajor) ? num_A_rows : num_A_cols;
     auto     B_height = (is_rowmajor) ? num_B_rows : num_B_cols;
     auto     C_height = (is_rowmajor) ? num_C_rows : num_C_cols;
-    auto     A_size = A_height * lda * sizeof(__half);
-    auto     B_size = B_height * ldb * sizeof(__half);
-    auto     C_size = C_height * ldc * sizeof(__half);
+    auto     A_size = A_height * lda * sizeof(T);
+    auto     B_size = B_height * ldb * sizeof(T);
+    auto     C_size = C_height * ldc * sizeof(T);
       
     float alpha = 1.0f;
     float beta = 0.0f;
 
     // Device memory management
-    __half* dA_pruned, * dB, * dC;
+    T* dA_pruned, * dB, * dC;
     CHECK_CUDA(cudaMalloc((void**)&dA_pruned, A_size))
     CHECK_CUDA(cudaMalloc((void**)&dB, B_size))
     CHECK_CUDA(cudaMalloc((void**)&dC, C_size))
@@ -320,7 +314,7 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUDA(cudaMemset(dC, 0, C_size))
 
     int* d_csr_offsets, * d_csr_columns;
-    __half* d_csr_values;
+    T* d_csr_values;
     CHECK_CUDA(cudaMalloc((void**)&d_csr_offsets, (num_A_rows + 1) * sizeof(int)))
 
     // convert dense matrix tmpA --> sparse matrix matA in CSR format
@@ -342,7 +336,7 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     int64_t num_rows_tmp, num_cols_tmp, nnz;
     CHECK_CUSPARSE(cusparseSpMatGetSize(matA, &num_rows_tmp, &num_cols_tmp, &nnz))    // get number of non-zero elements   
     CHECK_CUDA(cudaMalloc((void**)&d_csr_columns, nnz * sizeof(int)))
-    CHECK_CUDA(cudaMalloc((void**)&d_csr_values, nnz * sizeof(__half)))
+    CHECK_CUDA(cudaMalloc((void**)&d_csr_values, nnz * sizeof(T)))
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCsrSetPointers(matA, d_csr_offsets, d_csr_columns, d_csr_values))
     // execute Dense to Sparse conversion
@@ -388,13 +382,13 @@ int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     return EXIT_SUCCESS;
 }
 
-
-int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k)
+template <typename T>
+int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
-    auto          type = CUDA_R_16F;
+    auto          type = CUDA_R_32F;
     auto          compute_type = CUDA_R_32F;
     bool     is_rowmajor = (order == CUSPARSE_ORDER_ROW);
     bool     isA_transposed = (opA != CUSPARSE_OPERATION_NON_TRANSPOSE);
@@ -411,15 +405,15 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     auto     A_height = (is_rowmajor) ? num_A_rows : num_A_cols;
     auto     B_height = (is_rowmajor) ? num_B_rows : num_B_cols;
     auto     C_height = (is_rowmajor) ? num_C_rows : num_C_cols;
-    auto     A_size = A_height * lda * sizeof(__half);
-    auto     B_size = B_height * ldb * sizeof(__half);
-    auto     C_size = C_height * ldc * sizeof(__half);
+    auto     A_size = A_height * lda * sizeof(T);
+    auto     B_size = B_height * ldb * sizeof(T);
+    auto     C_size = C_height * ldc * sizeof(T);
 
     float alpha = 1.0f;
     float beta = 0.0f;
 
     // Device memory management
-    __half* dA_pruned, * dB, * dC;
+    T* dA_pruned, * dB, * dC;
     CHECK_CUDA(cudaMalloc((void**)&dA_pruned, A_size))
     CHECK_CUDA(cudaMalloc((void**)&dB, B_size))
     CHECK_CUDA(cudaMalloc((void**)&dC, C_size))
@@ -428,7 +422,7 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     CHECK_CUDA(cudaMemset(dC, 0, C_size))
 
     int* d_csc_offsets, * d_csc_rows;
-    __half* d_csc_values;
+    T* d_csc_values;
     CHECK_CUDA(cudaMalloc((void**)&d_csc_offsets, (num_A_cols + 1) * sizeof(int)))
 
     // convert dense matrix tmpA --> sparse matrix matA in CSC format
@@ -450,7 +444,7 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     int64_t num_rows_tmp, num_cols_tmp, nnz;
     CHECK_CUSPARSE(cusparseSpMatGetSize(matA, &num_rows_tmp, &num_cols_tmp, &nnz))    // get number of non-zero elements   
     CHECK_CUDA(cudaMalloc((void**)&d_csc_rows, nnz * sizeof(int)))
-    CHECK_CUDA(cudaMalloc((void**)&d_csc_values, nnz * sizeof(__half)))
+    CHECK_CUDA(cudaMalloc((void**)&d_csc_values, nnz * sizeof(T)))
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCscSetPointers(matA, d_csc_offsets, d_csc_rows, d_csc_values))
     // execute Dense to Sparse conversion
@@ -478,6 +472,7 @@ int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const i
     cudaEventDestroy(stop);
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
+
 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))

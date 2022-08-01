@@ -1,11 +1,10 @@
-#include <cusparseLt.h>
-
 #ifndef _KERNEL_CUH_
 #define _KERNEL_CUH_
 
-int cusLtMatmul(__half* hA, __half* hB, __half* hC, __half* hA_pruned, const int m, const int n, const int k, const int device_num = 0);
-int cusMatmulCoo(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k);
-int cusMatmulCsr(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k);
-int cusMatmulCsc(__half* hA_pruned, __half* hB, __half* hC, const int m, const int n, const int k);
+template <typename T> int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, const int k, const int device_num);
+template <typename T> int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k);
+template <typename T> int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k);
+template <typename T> int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k);
+#include "kernel.cu"
 
 #endif

@@ -3,32 +3,38 @@
 #include <cmath>
 #include<time.h>
 #include "_kernel.cuh"
+#include "main.h"
+
+typedef float input_type;
 
 #define HALF_EPSILON 0.001
+#define FLOAT_EPSILON 0.000001
 
-template <typename T = __half>
+template <typename T>
 void printMatrix(const T* matrix, const int row, const int col)
 {
+    int cnt = 0;
     std::cout << "\n-------------------------------------------------------------------------------" << std::endl;
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
-            std::cout << matrix[col * i + j] << " ";
+            if (matrix[col * i + j] == 0) {
+                std::cout << matrix[col * i + j] << " ";
+            }
         }
-        std::cout << std::endl;
     }
     std::cout << "-------------------------------------------------------------------------------\n" << std::endl;
-
+    
     return;
 }
 
 
-template <typename T = __half>
+template <typename T>
 void compareMatrix(const T* A, const T* B, const int row, const int col)
 {
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
             auto pos = col * i + j;
-            if (A[pos] - B[pos] > HALF_EPSILON) {     // __half EPSILON
+            if (A[pos] - B[pos] > FLOAT_EPSILON) {     // precision EPSILON
                 std::cout << "Two matrices are different." << std::endl;
                 return;
             }
@@ -38,10 +44,10 @@ void compareMatrix(const T* A, const T* B, const int row, const int col)
     return;
 }
 
-template <typename T = __half>
+template <typename T>
 void makeSparsity(T* A, const int row, const int col, const double sparsity)
 {
-    int target_nz = static_cast<int>(ceil(row * col * sparsity)); 
+    int target_nz = static_cast<T>(ceil(row * col * sparsity)); 
     int matrix_nz = 0;  // number of zero in matrix
     int i = 0;
     int j = 0;
@@ -65,7 +71,7 @@ void makeSparsity(T* A, const int row, const int col, const double sparsity)
                 p++;
                 pos = col * i + j;
                 if (A[pos] != 0) {
-                    A[pos] = static_cast<__half>(0.f);
+                    A[pos] = static_cast<T>(0.f);
                     matrix_nz++;
                     if (matrix_nz == target_nz) {
                         exitOuterLoop = true;
@@ -96,21 +102,21 @@ int main(void)
     auto C_size = m * n;
 
     // host memory allocation
-    __half* hA = (__half*)malloc(A_size * sizeof(__half));
-    __half* hA_pruned = (__half*)malloc(A_size * sizeof(__half));   memset(hA_pruned, 0, A_size * sizeof(__half));
-    __half* hB = (__half*)malloc(B_size * sizeof(__half));
-    __half* lt_hC = (__half*)malloc(C_size * sizeof(__half));           memset(lt_hC, 0, C_size * sizeof(__half));
-    __half* coo_hC = (__half*)malloc(C_size * sizeof(__half));           memset(coo_hC, 0, C_size * sizeof(__half));
-    __half* csr_hC = (__half*)malloc(C_size * sizeof(__half));           memset(csr_hC, 0, C_size * sizeof(__half));
-    __half* csc_hC = (__half*)malloc(C_size * sizeof(__half));           memset(csc_hC, 0, C_size * sizeof(__half));
+    input_type* hA = (input_type*)malloc(A_size * sizeof(input_type));
+    input_type* hA_pruned = (input_type*)malloc(A_size * sizeof(input_type));   memset(hA_pruned, 0, A_size * sizeof(input_type));
+    input_type* hB = (input_type*)malloc(B_size * sizeof(input_type));
+    input_type* lt_hC = (input_type*)malloc(C_size * sizeof(input_type));           memset(lt_hC, 0, C_size * sizeof(input_type));
+    input_type* coo_hC = (input_type*)malloc(C_size * sizeof(input_type));           memset(coo_hC, 0, C_size * sizeof(input_type));
+    input_type* csr_hC = (input_type*)malloc(C_size * sizeof(input_type));           memset(csr_hC, 0, C_size * sizeof(input_type));
+    input_type* csc_hC = (input_type*)malloc(C_size * sizeof(input_type));           memset(csc_hC, 0, C_size * sizeof(input_type));
 
 
     // fill matrix A, matrix B  0 ~ 9
     srand(time(NULL)); 
     for (int i = 0; i < A_size; i++)
-        hA[i] = static_cast<__half>(static_cast<float>(std::rand() % 10));
+        hA[i] = static_cast<float>(std::rand() % 10);
     for (int i = 0; i < B_size; i++)
-        hB[i] = static_cast<__half>(static_cast<float>(std::rand() % 10));
+        hB[i] = static_cast<float>(std::rand() % 10);
 
     
     // sparsity 50%
@@ -124,9 +130,9 @@ int main(void)
     // sparsity 75%
     std::cout << "\n---------- sparisty is 75% ----------" << std::endl;
     makeSparsity(hA_pruned, m, k, 0.75);
-    memset(coo_hC, 0, C_size * sizeof(__half));
-    memset(csr_hC, 0, C_size * sizeof(__half));
-    memset(csc_hC, 0, C_size * sizeof(__half));
+    memset(coo_hC, 0, C_size * sizeof(input_type));
+    memset(csr_hC, 0, C_size * sizeof(input_type));
+    memset(csc_hC, 0, C_size * sizeof(input_type));
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
@@ -135,9 +141,9 @@ int main(void)
     // sparsity 87.5%
     std::cout << "\n---------- sparisty is 87.5% ----------" << std::endl;
     makeSparsity(hA_pruned, m, k, 0.875);
-    memset(coo_hC, 0, C_size * sizeof(__half));
-    memset(csr_hC, 0, C_size * sizeof(__half));
-    memset(csc_hC, 0, C_size * sizeof(__half));
+    memset(coo_hC, 0, C_size * sizeof(input_type));
+    memset(csr_hC, 0, C_size * sizeof(input_type));
+    memset(csc_hC, 0, C_size * sizeof(input_type));
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
@@ -146,9 +152,9 @@ int main(void)
     // sparsity 99%
     std::cout << "\n---------- sparisty is 99% ----------" << std::endl;
     makeSparsity(hA_pruned, m, k, 0.99);
-    memset(coo_hC, 0, C_size * sizeof(__half));
-    memset(csr_hC, 0, C_size * sizeof(__half));
-    memset(csc_hC, 0, C_size * sizeof(__half));
+    memset(coo_hC, 0, C_size * sizeof(input_type));
+    memset(csr_hC, 0, C_size * sizeof(input_type));
+    memset(csc_hC, 0, C_size * sizeof(input_type));
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
