@@ -23,6 +23,7 @@
     }                                                                          \
 }  
 
+
 constexpr int EXIT_UNSUPPORTED = 2;
 
 // cusparseLtMatmul  -->  D = alpha * A * B + beta * C
@@ -71,7 +72,7 @@ int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, con
     CHECK_CUDA(cudaMalloc((void**)&dA, A_size))  
     CHECK_CUDA(cudaMalloc((void**)&dB, B_size))  
     CHECK_CUDA(cudaMalloc((void**)&dC, C_size))  
-    dD = dC;    // beta가 0이라 상관 x?
+    dD = dC;
 
     CHECK_CUDA(cudaMemcpy(dA, hA, A_size, cudaMemcpyHostToDevice))  
     CHECK_CUDA(cudaMemcpy(dB, hB, B_size, cudaMemcpyHostToDevice))  
@@ -117,7 +118,7 @@ int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, con
     CHECK_CUDA(cudaMalloc((void**)&dA_compressed, compressed_size)) // memory allocation dA_compressed
     CHECK_CUSPARSE(cusparseLtSpMMACompress(&handle, &plan, dA, dA_compressed, stream))  
 
-    // 왜 베스트 커널 찾나?
+    
     void* d_workspace = nullptr;
     int           num_streams = 0;
     cudaStream_t* streams = nullptr;
@@ -442,7 +443,7 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc(&dBuffer1, bufferSize1))
     CHECK_CUSPARSE(cusparseDenseToSparse_analysis(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, dBuffer1)) // execute Dense to Sparse conversion                                                                                                                         
     int64_t num_rows_tmp, num_cols_tmp, nnz;
-    CHECK_CUSPARSE(cusparseSpMatGetSize(matA, &num_rows_tmp, &num_cols_tmp, &nnz))    // get number of non-zero elements   
+    CHECK_CUSPARSE(cusparseSpMatGetSize(matA, &num_rows_tmp, &num_cols_tmp, &nnz))    // get number of non-zero elements  
     CHECK_CUDA(cudaMalloc((void**)&d_csc_rows, nnz * sizeof(int)))
     CHECK_CUDA(cudaMalloc((void**)&d_csc_values, nnz * sizeof(T)))
     // reset row indices, column indices, and values pointers
