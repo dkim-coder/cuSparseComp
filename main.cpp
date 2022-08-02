@@ -13,20 +13,28 @@ typedef float input_type;
 template <typename T>
 void printMatrix(const T* matrix, const int row, const int col)
 {
-    int cnt = 0;
+    int pos;
+    int cnt = 0;  
+    int r_cnt = 0;
+
     std::cout << "\n-------------------------------------------------------------------------------" << std::endl;
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
-            if (matrix[col * i + j] == 0) {
-                std::cout << matrix[col * i + j] << " ";
+            pos = col * i + j;
+            if (matrix[pos] == 0) {
+                cnt++;
+                r_cnt++;
             }
+            std::cout << matrix[pos] << " ";
         }
+        std::cout << "--> " << r_cnt << std::endl;
+        r_cnt = 0;
     }
     std::cout << "-------------------------------------------------------------------------------\n" << std::endl;
-    
+    std::cout << "total number of zero is : " << cnt << std::endl;
+
     return;
 }
-
 
 template <typename T>
 void compareMatrix(const T* A, const T* B, const int row, const int col)
@@ -40,6 +48,7 @@ void compareMatrix(const T* A, const T* B, const int row, const int col)
             }
         }
     }
+    std::cout << "Two matrices are same." << std::endl;
 
     return;
 }
@@ -47,10 +56,9 @@ void compareMatrix(const T* A, const T* B, const int row, const int col)
 template <typename T>
 void makeSparsity(T* A, const int row, const int col, const double sparsity)
 {
-    int target_nz = static_cast<T>(ceil(row * col * sparsity)); 
+    int target_nz = static_cast<int>(ceil(row * col * sparsity)); 
     int matrix_nz = 0;  // number of zero in matrix
-    int i = 0;
-    int j = 0;
+    int i, j;
     int pos;
 
     // find nubmer of zero in matrix
@@ -88,6 +96,58 @@ void makeSparsity(T* A, const int row, const int col, const double sparsity)
     return;
 }
 
+template <typename T>
+void makeSparsity2(T* A, const int row, const int col, const double sparsity)
+{
+    int target_nz = static_cast<int>(ceil(row * col * sparsity));
+    int matrix_nz = 0;  // number of zero in matrix
+    int i, j;
+    int row_nz = static_cast<int>(floor(col * sparsity));   // 각 행에 있어야 할 0 개수
+    int* each_row_nz = (int*)malloc(row * sizeof(int));
+    memset(each_row_nz, 0, row * sizeof(int));
+    int pos;
+
+    // find nubmer of zero in matrix
+    for (i = 0; i < row; i++) {
+        for (j = 0; j < col; j++) {
+            if (A[col * i + j] == 0) {
+                matrix_nz++;
+                each_row_nz[i]++;    // 행 0 개수 값 update
+            }
+        }
+    }
+
+    srand(time(NULL));
+    i = 0;
+    while (matrix_nz < target_nz) {
+        for (i = 0; i < row; i++) {
+            if (each_row_nz[i] <= row_nz && matrix_nz < target_nz) {
+                while (true) {
+                    pos = col * i + rand() % col;
+                    if (A[pos] != 0) {
+                        A[pos] = 0;
+                        matrix_nz++;
+                        each_row_nz[i]++;
+                        break;
+                    }
+                }
+            }
+        }
+        /*while (each_row_nz[i] < row_nz || matrix_nz < target_nz) {
+            pos = col * i + rand() % col;
+            if (A[pos] != 0) {
+                A[pos] = 0;
+                matrix_nz++;
+                each_row_nz[i]++;
+            }
+        }
+        if (++i == row) i = 0;*/
+    }
+    std::cout << "\nA_pruned Sparsity is : " << (double)target_nz / (row * col) << std::endl << std::endl;
+    free(each_row_nz);
+
+    return;
+}
 
 // A(m x k), B(k x n), C(m x n) --> row-major order
 int main(void)
@@ -129,7 +189,7 @@ int main(void)
 
     // sparsity 75%
     std::cout << "\n---------- sparisty is 75% ----------" << std::endl;
-    makeSparsity(hA_pruned, m, k, 0.75);
+    makeSparsity2(hA_pruned, m, k, 0.75);
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
@@ -140,7 +200,7 @@ int main(void)
 
     // sparsity 87.5%
     std::cout << "\n---------- sparisty is 87.5% ----------" << std::endl;
-    makeSparsity(hA_pruned, m, k, 0.875);
+    makeSparsity2(hA_pruned, m, k, 0.875);
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
@@ -151,7 +211,7 @@ int main(void)
 
     // sparsity 99%
     std::cout << "\n---------- sparisty is 99% ----------" << std::endl;
-    makeSparsity(hA_pruned, m, k, 0.99);
+    makeSparsity2(hA_pruned, m, k, 0.99);
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
