@@ -102,9 +102,8 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
     int target_nz = static_cast<int>(ceil(row * col * sparsity));
     int matrix_nz = 0;  // number of zero in matrix
     int i, j;
-    int row_nz = static_cast<int>(floor(col * sparsity));   // 각 행에 있어야 할 0 개수
-    int* each_row_nz = (int*)malloc(row * sizeof(int));
-    memset(each_row_nz, 0, row * sizeof(int));
+    int row_nz = static_cast<int>(floor(col * sparsity));
+    int* each_row_nz = (int*)malloc(row * sizeof(int)); memset(each_row_nz, 0, row * sizeof(int));
     int pos;
 
     // find nubmer of zero in matrix
@@ -118,7 +117,6 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
     }
 
     srand(time(NULL));
-    i = 0;
     while (matrix_nz < target_nz) {
         for (i = 0; i < row; i++) {
             if (each_row_nz[i] <= row_nz && matrix_nz < target_nz) {
@@ -133,15 +131,6 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
                 }
             }
         }
-        /*while (each_row_nz[i] < row_nz || matrix_nz < target_nz) {
-            pos = col * i + rand() % col;
-            if (A[pos] != 0) {
-                A[pos] = 0;
-                matrix_nz++;
-                each_row_nz[i]++;
-            }
-        }
-        if (++i == row) i = 0;*/
     }
     std::cout << "\nA_pruned Sparsity is : " << (double)target_nz / (row * col) << std::endl << std::endl;
     free(each_row_nz);
