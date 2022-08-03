@@ -4,6 +4,7 @@
 #include<time.h>
 #include "_kernel.cuh"
 #include "main.h"
+#include<algorithm>
 
 typedef float input_type;
 
@@ -96,6 +97,8 @@ void makeSparsity(T* A, const int row, const int col, const double sparsity)
     return;
 }
 
+
+// upgrade makeSparsity function
 template <typename T>
 void makeSparsity2(T* A, const int row, const int col, const double sparsity)
 {
@@ -133,6 +136,8 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
         }
     }
     std::cout << "\nA_pruned Sparsity is : " << (double)target_nz / (row * col) << std::endl << std::endl;
+    
+    // std::cout << "\n max :" << * std:: max_element(each_row_nz, each_row_nz + row) << " min : " << *std:: min_element(each_row_nz, each_row_nz + row) << std::endl;
     free(each_row_nz);
 
     return;
@@ -166,7 +171,8 @@ int main(void)
         hA[i] = static_cast<float>(std::rand() % 10);
     for (int i = 0; i < B_size; i++)
         hB[i] = static_cast<float>(std::rand() % 10);
-
+    for (int i = 0; i < A_size; i++)
+        hA_pruned[i] = static_cast<float>(std::rand() % 10);
     
     // sparsity 50%
     std::cout << "\n---------- sparisty is 50% ----------" << std::endl;
@@ -185,6 +191,8 @@ int main(void)
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
+    
+   
  
 
     // sparsity 87.5%
@@ -196,8 +204,8 @@ int main(void)
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
-
-
+   
+    
     // sparsity 99%
     std::cout << "\n---------- sparisty is 99% ----------" << std::endl;
     makeSparsity2(hA_pruned, m, k, 0.99);

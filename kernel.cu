@@ -366,6 +366,33 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
+    
+ /*   T* v = (T*)malloc(sizeof(T) * nnz);
+    int* o = (int*)malloc(sizeof(int) * (num_A_rows + 1));
+    int* c = (int*)malloc(sizeof(int) * nnz);
+    cudaMemcpy(v, d_csr_values, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
+    cudaMemcpy(o, d_csr_offsets, sizeof(int) * (num_A_rows + 1), cudaMemcpyDeviceToHost);
+    cudaMemcpy(c, d_csr_columns, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
+    
+
+    std::cout << "\nnnz -->\n";
+    for (int i = 0; i < nnz; i++) {
+        std::cout << v[i] << " ";
+    }
+    std::cout << std::endl;  std::cout << "\no -->";
+    for (int i = 0; i < num_A_rows + 1; i++) {
+        std::printf("%d ", o[i]);
+    }
+    std::cout << std::endl;  std::cout << "\nc -->";
+    for (int i = 0; i < nnz; i++) {
+        std::printf("%d ", c[i]);
+    }
+    
+    free(v);
+    free(o);
+    free(c);*/
+
+
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
     CHECK_CUSPARSE(cusparseDestroySpMat(matA))
@@ -386,12 +413,16 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 template <typename T>
 int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
-    auto          order = CUSPARSE_ORDER_ROW;
-    auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
+    auto          orderA = CUSPARSE_ORDER_COL;
+    auto          orderB = CUSPARSE_ORDER_ROW;
+    auto          orderC = CUSPARSE_ORDER_ROW;
+    auto          opA = CUSPARSE_OPERATION_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          type = CUDA_R_32F;
     auto          compute_type = CUDA_R_32F;
-    bool     is_rowmajor = (order == CUSPARSE_ORDER_ROW);
+    bool     is_rowmajorA = (orderA == CUSPARSE_ORDER_ROW);
+    bool     is_rowmajorB = (orderB == CUSPARSE_ORDER_ROW);
+    bool     is_rowmajorC = (orderC == CUSPARSE_ORDER_ROW);
     bool     isA_transposed = (opA != CUSPARSE_OPERATION_NON_TRANSPOSE);
     bool     isB_transposed = (opB != CUSPARSE_OPERATION_NON_TRANSPOSE);
     auto     num_A_rows = (isA_transposed) ? k : m;
@@ -400,12 +431,12 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     auto     num_B_cols = (isB_transposed) ? k : n;
     auto     num_C_rows = m;
     auto     num_C_cols = n;
-    auto     lda = (is_rowmajor) ? num_A_cols : num_A_rows;
-    auto     ldb = (is_rowmajor) ? num_B_cols : num_B_rows;
-    auto     ldc = (is_rowmajor) ? num_C_cols : num_C_rows;
-    auto     A_height = (is_rowmajor) ? num_A_rows : num_A_cols;
-    auto     B_height = (is_rowmajor) ? num_B_rows : num_B_cols;
-    auto     C_height = (is_rowmajor) ? num_C_rows : num_C_cols;
+    auto     lda = (is_rowmajorA) ? num_A_cols : num_A_rows;
+    auto     ldb = (is_rowmajorB) ? num_B_cols : num_B_rows;
+    auto     ldc = (is_rowmajorC) ? num_C_cols : num_C_rows;
+    auto     A_height = (is_rowmajorA) ? num_A_rows : num_A_cols;
+    auto     B_height = (is_rowmajorB) ? num_B_rows : num_B_cols;
+    auto     C_height = (is_rowmajorC) ? num_C_rows : num_C_cols;
     auto     A_size = A_height * lda * sizeof(T);
     auto     B_size = B_height * ldb * sizeof(T);
     auto     C_size = C_height * ldc * sizeof(T);
@@ -436,7 +467,7 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     size_t               bufferSize2 = 0;
 
     CHECK_CUSPARSE(cusparseCreate(&handle))
-    CHECK_CUSPARSE(cusparseCreateDnMat(&tmpA, num_A_rows, num_A_cols, lda, dA_pruned, type, order))
+    CHECK_CUSPARSE(cusparseCreateDnMat(&tmpA, num_A_rows, num_A_cols, lda, dA_pruned, type, orderA))
     CHECK_CUSPARSE(cusparseCreateCsc(&matA, num_A_rows, num_A_cols, 0, d_csc_offsets, NULL, NULL, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, type)) // Create sparse matrix A in Coo format   
     // allocate an external buffer if needed
     CHECK_CUSPARSE(cusparseDenseToSparse_bufferSize(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, &bufferSize1))
@@ -452,8 +483,8 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUSPARSE(cusparseDenseToSparse_convert(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, dBuffer1))
     // -----------------------------------------------------------------------------------------
     // Create dense matrix 
-    CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, order))
-    CHECK_CUSPARSE(cusparseCreateDnMat(&matC, num_C_rows, num_C_cols, ldc, dC, type, order))
+    CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, orderB))
+    CHECK_CUSPARSE(cusparseCreateDnMat(&matC, num_C_rows, num_C_cols, ldc, dC, type, orderC))
     // allocate an external buffer if needed
     CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize2))
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
@@ -474,6 +505,32 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
+    
+    //T* v = (T*)malloc(sizeof(T) * nnz);
+    //int* o = (int*)malloc(sizeof(int) * (num_A_cols + 1));
+    //int* r = (int*)malloc(sizeof(int) * nnz);
+    //cudaMemcpy(v, d_csc_values, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
+    //cudaMemcpy(o, d_csc_offsets, sizeof(int) * (num_A_cols + 1), cudaMemcpyDeviceToHost);
+    //cudaMemcpy(r, d_csc_rows, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
+    //
+
+    //std::cout << "\nnnz -->\n";
+    //for (int i = 0; i < nnz; i++) {
+    //    std::cout << v[i] << " ";
+    //}
+    //std::cout << std::endl; std::cout << "\no -->\n";
+    //for (int i = 0; i < num_A_cols + 1; i++) {
+    //    std::printf("%d ", o[i]);
+    //}
+    //std::cout << std::endl; std::cout << "\nr -->\n";
+    //for (int i = 0; i < nnz; i++) {
+    //    std::printf("%d ",r[i]);
+    //}
+
+    //free(v);
+    //free(o);
+    //free(r);
+    
 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
