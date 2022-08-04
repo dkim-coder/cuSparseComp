@@ -195,8 +195,6 @@ int main(void)
     cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
 
 
-
-
     // sparsity 87.5%
     std::cout << "\n---------- sparisty is 87.5% ----------" << std::endl;
     makeSparsity2(hA_pruned, m, k, 0.875);
@@ -229,7 +227,5 @@ int main(void)
     free(csc_hC);
 
         
-    
-
     return EXIT_SUCCESS;
 }

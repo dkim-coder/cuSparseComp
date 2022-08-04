@@ -366,31 +366,34 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
-    
- /*   T* v = (T*)malloc(sizeof(T) * nnz);
+    // check Csr format memory layout
+   /* T* v = (T*)malloc(sizeof(T) * nnz);
     int* o = (int*)malloc(sizeof(int) * (num_A_rows + 1));
     int* c = (int*)malloc(sizeof(int) * nnz);
     cudaMemcpy(v, d_csr_values, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
     cudaMemcpy(o, d_csr_offsets, sizeof(int) * (num_A_rows + 1), cudaMemcpyDeviceToHost);
     cudaMemcpy(c, d_csr_columns, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
     
-
+    std::cout << "-------------Csr format memory layout-------------------" << std::endl;
     std::cout << "\nnnz -->\n";
     for (int i = 0; i < nnz; i++) {
         std::cout << v[i] << " ";
     }
-    std::cout << std::endl;  std::cout << "\no -->";
+    std::cout << std::endl;  std::cout << "\no -->\n";
     for (int i = 0; i < num_A_rows + 1; i++) {
-        std::printf("%d ", o[i]);
+        std::cout << o[i] << " ";
     }
-    std::cout << std::endl;  std::cout << "\nc -->";
+    std::cout << std::endl;  std::cout << "\nc -->\n";
     for (int i = 0; i < nnz; i++) {
-        std::printf("%d ", c[i]);
+        std::cout << c[i] << " ";
     }
-    
+    std::cout << "\n---------------------------------------------------" << std::endl;
+
+
     free(v);
     free(o);
     free(c);*/
+    // --------------------------------------------------------//
 
 
     // destroy matrix/vector descriptors
@@ -506,6 +509,7 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
     
+    // check Csc format memory layout
     //T* v = (T*)malloc(sizeof(T) * nnz);
     //int* o = (int*)malloc(sizeof(int) * (num_A_cols + 1));
     //int* r = (int*)malloc(sizeof(int) * nnz);
@@ -513,23 +517,25 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     //cudaMemcpy(o, d_csc_offsets, sizeof(int) * (num_A_cols + 1), cudaMemcpyDeviceToHost);
     //cudaMemcpy(r, d_csc_rows, sizeof(int) * nnz, cudaMemcpyDeviceToHost);
     //
-
+    //std::cout << "-------------Csc format memory layout-------------------" << std::endl;
     //std::cout << "\nnnz -->\n";
     //for (int i = 0; i < nnz; i++) {
     //    std::cout << v[i] << " ";
     //}
     //std::cout << std::endl; std::cout << "\no -->\n";
     //for (int i = 0; i < num_A_cols + 1; i++) {
-    //    std::printf("%d ", o[i]);
+    //    std::cout << o[i] << " ";
     //}
     //std::cout << std::endl; std::cout << "\nr -->\n";
     //for (int i = 0; i < nnz; i++) {
-    //    std::printf("%d ",r[i]);
+    //    std::cout << r[i] << " ";
     //}
-
+    //std::cout << "\n---------------------------------------------------" << std::endl;
+    //
     //free(v);
     //free(o);
     //free(r);
+    // ----------------------------------------------------------------------------//
     
 
     // destroy matrix/vector descriptors
