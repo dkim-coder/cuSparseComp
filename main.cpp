@@ -146,6 +146,8 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
 // A(m x k), B(k x n), C(m x n) --> row-major order
 int main(void)
 {
+
+    
     // input m, n, k
     int m, n, k;
     std::cout << "input m, n, k " << std::endl;
@@ -166,21 +168,21 @@ int main(void)
 
 
     // fill matrix A, matrix B  0 ~ 9
-    srand(time(NULL)); 
+    srand(time(NULL));
     for (int i = 0; i < A_size; i++)
         hA[i] = static_cast<float>(std::rand() % 10);
     for (int i = 0; i < B_size; i++)
         hB[i] = static_cast<float>(std::rand() % 10);
     for (int i = 0; i < A_size; i++)
         hA_pruned[i] = static_cast<float>(std::rand() % 10);
-    
+
     // sparsity 50%
     std::cout << "\n---------- sparisty is 50% ----------" << std::endl;
-    cusLtMatmul(hA, hB, lt_hC, hA_pruned, m, n, k);     // --> hA_pruned copy 해온다.      //  16배수만 되고 8배수는 안된다.
-    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);    
-    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
-   
+    cusLtMatmul(hA, hB, lt_hC, hA_pruned, m, n, k);    // --> hA_pruned copy 해온다.      //  16배수만 되고 8배수는 안된다.
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
+
 
     // sparsity 75%
     std::cout << "\n---------- sparisty is 75% ----------" << std::endl;
@@ -188,12 +190,12 @@ int main(void)
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
-    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
-    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
-    
-   
- 
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
+
+
+
 
     // sparsity 87.5%
     std::cout << "\n---------- sparisty is 87.5% ----------" << std::endl;
@@ -201,20 +203,20 @@ int main(void)
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
-    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
-    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
-   
-    
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
+
+
     // sparsity 99%
     std::cout << "\n---------- sparisty is 99% ----------" << std::endl;
     makeSparsity2(hA_pruned, m, k, 0.99);
     memset(coo_hC, 0, C_size * sizeof(input_type));
     memset(csr_hC, 0, C_size * sizeof(input_type));
     memset(csc_hC, 0, C_size * sizeof(input_type));
-    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k);
-    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k);
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
+    cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
+    cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
 
 
     // free host memory
@@ -225,6 +227,9 @@ int main(void)
     free(coo_hC);
     free(csr_hC);
     free(csc_hC);
+
+        
+    
 
     return EXIT_SUCCESS;
 }
