@@ -236,8 +236,14 @@ int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCooSetPointers(matA, d_coo_rows, d_coo_columns, d_coo_values))
     // execute Dense to Sparse conversion
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseDenseToSparse_convert(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, dBuffer1))
-            
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
+    std::cout << "\ncusparseCOO format change time : " << ms << "ms" << std::endl;
+
+
     // -----------------------------------------------------------------------------------------
     // Create dense matrix 
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, order))
@@ -247,11 +253,11 @@ int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
     
     // perform matrix multiplication SpMM
-    cudaEventRecord(start);
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms, start, stop);
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
     std::cout << "cusparseCOO spending time : " << ms << "ms" << std::endl;
 
 
@@ -350,7 +356,14 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCsrSetPointers(matA, d_csr_offsets, d_csr_columns, d_csr_values))
     // execute Dense to Sparse conversion
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseDenseToSparse_convert(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, dBuffer1))
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
+    std::cout << "\ncusparseCSR format change time : " << ms << "ms" << std::endl;
+
+
     // -----------------------------------------------------------------------------------------
     // Create dense matrix 
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, order))
@@ -360,11 +373,11 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
 
     // execute SpMM
-    cudaEventRecord(start);
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms, start, stop);
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
     std::cout << "cusparseCSR spending time : " << ms << "ms" << std::endl;
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
@@ -494,7 +507,13 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     // reset row indices, column indices, and values pointers
     CHECK_CUSPARSE(cusparseCscSetPointers(matA, d_csc_offsets, d_csc_rows, d_csc_values))
     // execute Dense to Sparse conversion
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseDenseToSparse_convert(handle, tmpA, matA, CUSPARSE_DENSETOSPARSE_ALG_DEFAULT, dBuffer1))
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
+    std::cout << "\ncusparseCSC format change time : " << ms << "ms" << std::endl;
+
     // -----------------------------------------------------------------------------------------
     // Create dense matrix 
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, orderB))
@@ -504,11 +523,11 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
 
     // execute SpMM
-    cudaEventRecord(start);
+    CHECK_CUDA(cudaEventRecord(start))
     CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms, start, stop);
+    CHECK_CUDA(cudaEventRecord(stop))
+    CHECK_CUDA(cudaEventSynchronize(stop))
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop))
     std::cout << "cusparseCSC spending time : " << ms << "ms" << std::endl;
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
