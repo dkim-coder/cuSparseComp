@@ -79,6 +79,10 @@ int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, con
     CHECK_CUDA(cudaMemset(dC, 0, C_size))   
 
     // ---------------------------------------------------------------------------------------------
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    float ms = 0.0f;
     cusparseLtHandle_t             handle;  
     cusparseLtMatDescriptor_t      matA, matB, matC;    
     cusparseLtMatmulDescriptor_t   matmul;  
@@ -128,23 +132,21 @@ int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, con
          std::cout << "alg_id : " << alg_id << std::endl; */
 
     // Perform the matrix multiplication
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
     cudaEventRecord(start);
     CHECK_CUSPARSE(cusparseLtMatmul(&handle, &plan, &alpha, dA_compressed, dB, &beta, dC, dD, d_workspace, streams, num_streams))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-    float ms = 0.0f;
     cudaEventElapsedTime(&ms, start, stop);
     std::cout << "cusparseLt spending time : " << ms << "ms" << std::endl;
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 
 
     // memory copy device to host
     CHECK_CUDA(cudaMemcpy(hA_pruned, dA, A_size, cudaMemcpyDeviceToHost))   // pruned with 50sparsity matrix A copy to host 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))  
+
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     // destroy plan and handle
     CHECK_CUSPARSE(cusparseLtMatDescriptorDestroy(&matA))
@@ -166,6 +168,7 @@ int cusLtMatmul(T* hA, T* hB, T* hC, T* hA_pruned, const int m, const int n, con
 template <typename T>
 int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
+    auto algo = CUSPARSE_SPMM_ALG_DEFAULT;
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
@@ -206,6 +209,10 @@ int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     T* d_coo_values;
         
     // convert dense matrix tmpA --> sparse matrix matA in COO format
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    float ms = 0.0f;
     cusparseHandle_t     handle = NULL;
     cusparseSpMatDescr_t matA;
     cusparseDnMatDescr_t tmpA, matB, matC;
@@ -236,26 +243,23 @@ int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, order))
     CHECK_CUSPARSE(cusparseCreateDnMat(&matC, num_C_rows, num_C_cols, ldc, dC, type, order))
     // allocate an external buffer if needed
-    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize2))
+    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, &bufferSize2))
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
     
     // perform matrix multiplication SpMM
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
     cudaEventRecord(start);
-    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
+    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-    float ms = 0.0f;
     cudaEventElapsedTime(&ms, start, stop);
     std::cout << "cusparseCOO spending time : " << ms << "ms" << std::endl;
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
      
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
     CHECK_CUSPARSE(cusparseDestroyDnMat(matB))
@@ -278,6 +282,7 @@ int cusMatmulCoo(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 template <typename T>
 int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
+    auto algo = CUSPARSE_SPMM_ALG_DEFAULT;
     auto          order = CUSPARSE_ORDER_ROW;
     auto          opA = CUSPARSE_OPERATION_NON_TRANSPOSE;
     auto          opB = CUSPARSE_OPERATION_NON_TRANSPOSE;
@@ -319,6 +324,10 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc((void**)&d_csr_offsets, (num_A_rows + 1) * sizeof(int)))
 
     // convert dense matrix tmpA --> sparse matrix matA in CSR format
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    float ms = 0.0f;
     cusparseHandle_t     handle = NULL;
     cusparseDnMatDescr_t tmpA, matB, matC;
     cusparseSpMatDescr_t matA;
@@ -347,22 +356,16 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, order))
     CHECK_CUSPARSE(cusparseCreateDnMat(&matC, num_C_rows, num_C_cols, ldc, dC, type, order))
     // allocate an external buffer if needed
-    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize2))
+    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, &bufferSize2))
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
 
     // execute SpMM
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
     cudaEventRecord(start);
-    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
+    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-    float ms = 0.0f;
     cudaEventElapsedTime(&ms, start, stop);
     std::cout << "cusparseCSR spending time : " << ms << "ms" << std::endl;
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
@@ -396,6 +399,9 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     // --------------------------------------------------------//
 
 
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))
     CHECK_CUSPARSE(cusparseDestroySpMat(matA))
@@ -416,6 +422,7 @@ int cusMatmulCsr(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
 template <typename T>
 int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int k)
 {
+    auto algo = CUSPARSE_SPMM_ALG_DEFAULT;
     auto          orderA = CUSPARSE_ORDER_COL;
     auto          orderB = CUSPARSE_ORDER_ROW;
     auto          orderC = CUSPARSE_ORDER_ROW;
@@ -461,6 +468,10 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUDA(cudaMalloc((void**)&d_csc_offsets, (num_A_cols + 1) * sizeof(int)))
 
     // convert dense matrix tmpA --> sparse matrix matA in CSC format
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    float ms = 0.0f;
     cusparseHandle_t     handle = NULL;
     cusparseDnMatDescr_t tmpA, matB, matC;
     cusparseSpMatDescr_t matA;
@@ -489,22 +500,16 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     CHECK_CUSPARSE(cusparseCreateDnMat(&matB, num_B_rows, num_B_cols, ldb, dB, type, orderB))
     CHECK_CUSPARSE(cusparseCreateDnMat(&matC, num_C_rows, num_C_cols, ldc, dC, type, orderC))
     // allocate an external buffer if needed
-    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize2))
+    CHECK_CUSPARSE(cusparseSpMM_bufferSize(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, &bufferSize2))
     CHECK_CUDA(cudaMalloc(&dBuffer2, bufferSize2))
 
     // execute SpMM
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
     cudaEventRecord(start);
-    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, CUSPARSE_SPMM_ALG_DEFAULT, dBuffer2))
+    CHECK_CUSPARSE(cusparseSpMM(handle, opA, opB, &alpha, matA, matB, &beta, matC, compute_type, algo, dBuffer2))
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-    float ms = 0.0f;
     cudaEventElapsedTime(&ms, start, stop);
     std::cout << "cusparseCSC spending time : " << ms << "ms" << std::endl;
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 
     CHECK_CUDA(cudaMemcpy(hC, dC, C_size, cudaMemcpyDeviceToHost))
 
@@ -537,6 +542,8 @@ int cusMatmulCsc(T* hA_pruned, T* hB, T* hC, const int m, const int n, const int
     //free(r);
     // ----------------------------------------------------------------------------//
     
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE(cusparseDestroyDnMat(tmpA))

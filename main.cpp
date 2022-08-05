@@ -119,12 +119,30 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
         }
     }
 
+    int limit = row_nz * row;
     srand(time(NULL));
     while (matrix_nz < target_nz) {
         for (i = 0; i < row; i++) {
-            if (each_row_nz[i] <= row_nz && matrix_nz < target_nz) {
+            if (limit == matrix_nz) break;
+            if ((each_row_nz[i] < row_nz) && (matrix_nz < target_nz)) {
                 while (true) {
-                    pos = col * i + rand() % col;
+                    pos = col * i + (std::rand() % col);
+                    if (A[pos] != 0) {
+                        A[pos] = 0;
+                        matrix_nz++;
+                        each_row_nz[i]++;
+                        break;
+                    }
+                }
+            }
+        }
+        if (limit == matrix_nz) break;
+    }
+    while (matrix_nz < target_nz) {
+        for (i = 0; i < row; i++) {
+            if ((each_row_nz[i] <= row_nz) && (matrix_nz < target_nz)) {
+                while (true) {
+                    pos = col * i + (std::rand() % col);
                     if (A[pos] != 0) {
                         A[pos] = 0;
                         matrix_nz++;
@@ -147,7 +165,6 @@ void makeSparsity2(T* A, const int row, const int col, const double sparsity)
 int main(void)
 {
 
-    
     // input m, n, k
     int m, n, k;
     std::cout << "input m, n, k " << std::endl;
@@ -192,7 +209,7 @@ int main(void)
     memset(csc_hC, 0, C_size * sizeof(input_type));
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
 
 
     // sparsity 87.5%
@@ -203,7 +220,7 @@ int main(void)
     memset(csc_hC, 0, C_size * sizeof(input_type));
     cusMatmulCoo(hA_pruned, hB, coo_hC, m, n, k); 
     cusMatmulCsr(hA_pruned, hB, csr_hC, m, n, k); 
-    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k); 
+    cusMatmulCsc(hA_pruned, hB, csc_hC, m, n, k);
 
 
     // sparsity 99%
